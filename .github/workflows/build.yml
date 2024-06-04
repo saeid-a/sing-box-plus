@@ -1,0 +1,102 @@
+name: Build and release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  create-release:
+    name: Create draft release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup environment
+        shell: bash
+        run: |
+          VERSION=$(awk '/^#### [0-9]+\.[0-9]+\.[0-9]+/{print $2; exit}' docs/changelog.md)
+          awk -v RS='#### [0-9]+\.[0-9]+\.[0-9]+' 'NR==2{print $0; exit}' docs/changelog.md > changelog.md
+          echo -e "Setting release name to version $VERSION"
+          echo "RELEASE_TAG=$VERSION" >> $GITHUB_ENV
+      - name: Create draft release
+        run: |
+          gh release create ${{ env.RELEASE_TAG }} --title ${{ env.RELEASE_TAG }} --notes-file changelog.md --latest --draft
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  cross:
+    needs: create-release
+    strategy:
+      matrix:
+        include:
+          # windows
+          - name: windows-amd64
+            goos: windows
+            goarch: amd64
+            goamd64: v1
+          - name: windows-amd64-v3
+            goos: windows
+            goarch: amd64
+            goamd64: v3
+          - name: windows-arm64
+            goos: windows
+            goarch: arm64
+          # linux
+          - name: linux-amd64
+            goos: linux
+            goarch: amd64
+            goamd64: v1
+          - name: linux-amd64-v3
+            goos: linux
+            goarch: amd64
+            goamd64: v3
+          - name: linux-arm64
+            goos: linux
+            goarch: arm64
+          # darwin
+          - name: darwin-amd64
+            goos: darwin
+            goarch: amd64
+            goamd64: v1
+          - name: darwin-amd64-v3
+            goos: darwin
+            goarch: amd64
+            goamd64: v3
+          - name: darwin-arm64
+            goos: darwin
+            goarch: arm64
+      fail-fast: true
+    runs-on: ubuntu-latest
+    env:
+      GOOS: ${{ matrix.goos }}
+      GOARCH: ${{ matrix.goarch }}
+      GOAMD64: ${{ matrix.goamd64 }}
+      CGO_ENABLED: 0
+      TAGS: with_gvisor,with_quic,with_wireguard,with_grpc,with_ech,with_utls,with_reality_server,with_acme,with_clash_api
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ^1.22
+      - name: Build
+        id: build
+        run: make
+      - name: Compress binaries
+        run: |
+          ls -R
+          7z a sing-box-${{ matrix.name }}.zip sing-box*
+      - name: Setup environment
+        shell: bash
+        run: |
+          RELEASE_TAG=$(awk '/^#### [0-9]+\.[0-9]+\.[0-9]+/{print $2; exit}' docs/changelog.md)
+          echo "RELEASE_TAG=$RELEASE_TAG" >> $GITHUB_ENV
+      - name: Add binary to release
+        run: |
+          gh release upload ${{ env.RELEASE_TAG }} sing-box-${{ matrix.name }}.zip --clobber
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
