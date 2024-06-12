@@ -19,6 +19,7 @@ require (
 	github.com/miekg/dns v1.1.62
 	github.com/ooni/go-libtor v1.1.8
 	github.com/oschwald/maxminddb-golang v1.12.0
+	github.com/redpilllabs/wireguard-go v0.0.7
 	github.com/sagernet/bbolt v0.0.0-20231014093535-ea5cb2fe9f0a
 	github.com/sagernet/cloudflare-tls v0.0.0-20231208171750-a4483c1b7cd1
 	github.com/sagernet/cors v1.2.1
@@ -38,7 +39,6 @@ require (
 	github.com/sagernet/sing-vmess v0.1.12
 	github.com/sagernet/smux v0.0.0-20231208180855-7041f6ea79e7
 	github.com/sagernet/utls v1.6.7
-	github.com/sagernet/wireguard-go v0.0.0-20231215174105-89dec3b2f3e8
 	github.com/sagernet/ws v0.0.0-20231204124109-acfe8907c854
 	github.com/spf13/cobra v1.8.0
 	github.com/stretchr/testify v1.9.0
