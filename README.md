@@ -62,6 +62,10 @@ Enable it by adding the `tls_fragment` entry to any outbound connection:
 ...
 ```
 
+## Example configurations
+
+See the `examples` directory for example configuration files.
+
 ## Fork License
 ```
 Copyright (C) 2024 by Kyōchikutō | キョウチクトウ 
