@@ -1,0 +1,135 @@
+name: Build and release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  create-release:
+    name: Create draft release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup environment
+        shell: bash
+        run: |
+          VERSION=$(grep -E -m 1 '^(###|####) ' docs/changelog.md | sed 's/^[#]* //')
+          RELEASE_NOTES=$(awk "/^### $VERSION$|^#### $VERSION$/{flag=1;next}/^(###|####) /{flag=0}flag" docs/changelog.md)
+          echo "$RELEASE_NOTES" > changelog.md
+          echo "RELEASE_TAG=v$VERSION" >> $GITHUB_ENV
+          echo "RELEASE_VERSION=$VERSION" >> $GITHUB_ENV
+          echo -e "Setting release name to version $RELEASE_VERSION"
+          echo -e "Release notes: ${RELEASE_NOTES}"
+      - name: Create draft release
+        run: |
+          gh release create ${{ env.RELEASE_TAG }} --title ${{ env.RELEASE_VERSION }} --notes-file changelog.md --latest --draft
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    outputs:
+      release_tag: ${{ env.RELEASE_TAG }}
+      release_version: ${{ env.RELEASE_VERSION }}
+  cross-compile:
+    needs: create-release
+    strategy:
+      matrix:
+        include:
+          # windows
+          - name: windows-amd64
+            goos: windows
+            goarch: amd64
+            goamd64: v1
+          - name: windows-amd64v3
+            goos: windows
+            goarch: amd64
+            goamd64: v3
+          - name: windows-arm64
+            goos: windows
+            goarch: arm64
+          - name: windows-386
+            goos: windows
+            goarch: 386
+          # linux
+          - name: linux-amd64
+            goos: linux
+            goarch: amd64
+            goamd64: v1
+          - name: linux-amd64v3
+            goos: linux
+            goarch: amd64
+            goamd64: v3
+          - name: linux-arm64
+            goos: linux
+            goarch: arm64
+          - name: linux-386
+            goos: linux
+            goarch: 386
+          - name: linux-armv5
+            goos: linux
+            goarch: arm
+            goarm: 5
+          - name: linux-armv6
+            goos: linux
+            goarch: arm
+            goarm: 6
+          - name: linux-armv7
+            goos: linux
+            goarch: arm
+            goarm: 7
+          # darwin
+          - name: darwin-amd64
+            goos: darwin
+            goarch: amd64
+            goamd64: v1
+          - name: darwin-amd64v3
+            goos: darwin
+            goarch: amd64
+            goamd64: v3
+          - name: darwin-arm64
+            goos: darwin
+            goarch: arm64
+          # freebsd
+          - name: freebsd-amd64
+            goos: freebsd
+            goarch: amd64
+            goamd64: v1
+          - name: freebsd-amd64v3
+            goos: freebsd
+            goarch: amd64
+            goamd64: v3
+          - name: freebsd-386
+            goos: freebsd
+            goarch: 386
+          - name: freebsd-arm64
+            goos: freebsd
+            goarch: arm64
+      fail-fast: true
+    runs-on: ubuntu-latest
+    env:
+      GOOS: ${{ matrix.goos }}
+      GOARCH: ${{ matrix.goarch }}
+      GOAMD64: ${{ matrix.goamd64 }}
+      CGO_ENABLED: 0
+      TAGS: with_gvisor,with_quic,with_wireguard,with_grpc,with_ech,with_utls,with_reality_server,with_acme,with_clash_api
+      RELEASE_TAG: ${{ needs.create-release.outputs.release_tag }}
+      RELEASE_VERSION: ${{ needs.create-release.outputs.release_version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ^1.23
+      - name: Build
+        id: build
+        run: make
+      - name: Compress binaries
+        run: |
+          7z a sing-box-${{ env.RELEASE_VERSION }}-${{ matrix.name }}.zip sing-box*
+      - name: Add binary to release
+        run: |
+          gh release upload ${{ env.RELEASE_TAG }} sing-box-${{ env.RELEASE_VERSION }}-${{ matrix.name }}.zip --clobber
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
